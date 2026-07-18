@@ -21,7 +21,7 @@ echo "[1] POST /api/session"
 S=$(curl -s -X POST "$BASE_URL/api/session" -H 'content-type: application/json' -d '{}')
 SID=$(field "$S" sessionId); KEY=$(field "$S" requesterKey); T=$(field "$S" t); SC=$(field "$S" shareCode)
 assert_contains "session has sessionId" "$S" '"sessionId"'
-assert_contains "session seeds a flight" "$S" '"carrier":"UA"'
+assert_contains "session seeds a flight" "$S" '"flight":{"carrier"'
 [ -n "$SID" ] && ok "captured sessionId" || bad "no sessionId"
 
 echo "[2] GET /api/voice-token (auth gates)"
