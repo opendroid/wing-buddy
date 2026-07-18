@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { VocalBridge, ConnectionState } from "@vocalbridgeai/sdk";
 import BigCallButton from "@/components/BigCallButton";
 import ShareSheet from "@/components/ShareSheet";
+import Transcript, { type TranscriptLine } from "@/components/Transcript";
 import { forwardTranscript } from "@/lib/forward-transcript";
 
 type CallState =
@@ -26,9 +27,24 @@ export default function HelpClient() {
   const [error, setError] = useState<string | null>(null);
   const [voiceWarning, setVoiceWarning] = useState<string | null>(null);
   const [familyInvited, setFamilyInvited] = useState(false);
+  const [lines, setLines] = useState<TranscriptLine[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const vbRef = useRef<VocalBridge | null>(null);
   const lastAgentLineRef = useRef<string>("");
+  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [lines]);
+
+  function appendLocalLine(role: "traveler" | "agent", text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setLines((prev) => [
+      ...prev,
+      { role, lang: "hi", text: trimmed, at: Date.now() },
+    ]);
+  }
 
   async function postLine(
     created: CreatedSession,
@@ -41,6 +57,7 @@ export default function HelpClient() {
       if (trimmed === lastAgentLineRef.current) return;
       lastAgentLineRef.current = trimmed;
     }
+    appendLocalLine(role, trimmed);
     try {
       await forwardTranscript({
         sessionId: created.sessionId,
@@ -62,6 +79,8 @@ export default function HelpClient() {
     setError(null);
     setVoiceWarning(null);
     setFamilyInvited(false);
+    setLines([]);
+    lastAgentLineRef.current = "";
     setState("requesting-mic");
 
     try {
@@ -255,6 +274,8 @@ export default function HelpClient() {
     setSession(null);
     setVoiceWarning(null);
     setFamilyInvited(false);
+    setLines([]);
+    lastAgentLineRef.current = "";
     setState("idle");
   }
 
@@ -292,6 +313,19 @@ export default function HelpClient() {
       )}
 
       <BigCallButton state={state} onTap={onTap} onEnd={onEnd} />
+
+      {live && (
+        <section
+          aria-label="Live conversation"
+          className="flex w-full max-h-64 flex-col gap-2 overflow-y-auto overscroll-contain rounded-xl px-1"
+        >
+          <p className="text-center text-xs font-medium uppercase tracking-wide text-text-muted">
+            Conversation
+          </p>
+          <Transcript lines={lines} dense />
+          <div ref={transcriptEndRef} aria-hidden />
+        </section>
+      )}
 
       {live && shareUrl && (
         <div className="flex w-full flex-col items-center gap-3">
