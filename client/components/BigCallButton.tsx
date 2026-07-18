@@ -31,6 +31,22 @@ export default function BigCallButton({
     );
   }
 
+  if (state === "connecting") {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="mt-8 flex h-44 w-44 flex-col items-center justify-center gap-3 rounded-full bg-accent/90 text-center text-base font-semibold text-white shadow-card"
+      >
+        <span
+          aria-hidden
+          className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white"
+        />
+        Connecting…
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"

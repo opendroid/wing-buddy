@@ -1,5 +1,4 @@
-import BigCallButton from "@/components/BigCallButton";
-import PinToggle from "@/components/PinToggle";
+import HelpClient from "./HelpClient";
 
 export default function HelpPage() {
   return (
@@ -13,11 +12,7 @@ export default function HelpPage() {
         </p>
       </header>
 
-      <BigCallButton state="idle" />
-
-      <div className="w-full max-w-sm">
-        <PinToggle />
-      </div>
+      <HelpClient />
 
       <p className="text-center text-sm text-text-muted">
         Your family can see this conversation if you share a link.
