@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Lean, self-contained server bundle for the Cloud Run image.
+  output: "standalone",
 };
 
 export default nextConfig;
