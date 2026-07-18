@@ -61,8 +61,19 @@ export const design = {
 // Per-speaker label colors (used by Transcript + StatusCard).
 export const speakerColors = design.colors.speaker;
 
+// Transcript speaker labels (PLAN-v2 §4.3) map onto the per-speaker palette.
+// "traveler" (requester) uses the requester/blue color.
 export type SpeakerRole = keyof typeof design.colors.speaker;
 
-export function speakerColor(role: SpeakerRole): string {
-  return design.colors.speaker[role];
+const speakerLabelToRole: Record<string, SpeakerRole> = {
+  traveler: "requester",
+  requester: "requester",
+  joiner: "joiner",
+  agent: "agent",
+  airline: "airline",
+};
+
+export function speakerColor(role: string): string {
+  const key = speakerLabelToRole[role] ?? "requester";
+  return design.colors.speaker[key];
 }
