@@ -8,23 +8,45 @@ Tailwind v4** with `@vocalbridgeai/react`. Sabre fully mocked. Designed for
 Source of truth for product/architecture decisions: **`PLAN-v2.md`** + **`CLAUDE.md`**.
 The older `PLAN.md` is historical only — do not implement from it.
 
+## Repo layout (monorepo)
+
+The Next.js app (client pages **and** its API route handlers — the "server
+code" — all in one deploy) lives under **`client/`**:
+
+```
+client/            # the whole Next.js app
+  app/             # pages + app/api/* route handlers
+  components/
+  lib/             # events, session-store, access, vocalbridge, design
+  public/
+  package.json, next.config.ts, vercel.json, Dockerfile, ...
+```
+
+CLAUDE.md requires this to be **one Next.js app**: client + API handlers stay
+together in `client/`. Sibling dirs (e.g. `server/`, `scripts/`, `infra/`) may
+be added at the repo root later, but must not split the app's in-memory session
+store or same-origin `/api/agent` relay across hosts.
+
 ## Commands
 
+All commands run from inside `client/`:
+
 ```bash
+cd client
 npm run dev       # local dev (single process — same semantics as prod)
 npm run build     # production build (also type-checks)
 npm run start     # serve the production build (port from PORT env, default 3000)
-npm run lint      # eslint (next lint config)
+npm run lint      # eslint
 ```
 
 Node 22+ (Next 16). Use `npm`, not `pnpm`/`yarn` (lockfile is package-lock.json).
 
 ## Environment
 
-Copy `.env.local.example` → `.env.local`. Required for live voice:
-`VOCAL_BRIDGE_API_KEY`, `VB_AGENT_ID`, `ACCESS_TOKEN_SECRET`. Never commit
-`.env.local` or any secret (CLAUDE.md repo rules). `.env.example` is tracked;
-`.env*` is git-ignored.
+From inside `client/`, copy `client/.env.local.example` → `client/.env.local`.
+Required for live voice: `VOCAL_BRIDGE_API_KEY`, `VB_AGENT_ID`,
+`ACCESS_TOKEN_SECRET`. Never commit `.env.local` or any secret (CLAUDE.md repo
+rules). `.env.local.example` is tracked; `.env*` is git-ignored.
 
 ## Architecture rules (non-negotiable — see CLAUDE.md)
 
@@ -70,30 +92,29 @@ Hour 2–4 work.
   animation).
 - Components in `components/` are prop-only stubs for Hour 1; real wiring Hour 2+.
 
-## Deployment — Cloud Run AND Vercel
+## Deployment — Vercel (only)
 
-### Cloud Run (primary)
-```bash
-gcloud run deploy wing-buddy --source . \
-  --min-instances 1 --max-instances 1 \
-  --allow-unauthenticated --region us-west1
-```
-`--max-instances 1` is **mandatory**: a second instance would split the
-in-memory session `Map`. Secrets via Secret Manager.
+The app is deployed to **Vercel** (no Cloud Run). Run all deploy commands from
+inside `client/`:
 
-### Vercel
 ```bash
+cd client
 vercel deploy
 ```
-**Constraint:** the in-memory store is unsafe on Vercel serverless multi-instance.
-Either:
+
+`client/vercel.json` is minimal (framework auto-detect + build commands). The
+same `package.json` scripts power the build.
+
+**Constraint — in-memory session store is unsafe on Vercel serverless
+multi-instance.** Either:
 - deploy with **`max-instances 1`** (Vercel Pro/Enterprise function concurrency
   limit), or
 - set `SESSION_STORE=kv` and implement the KV-backed `SessionStore`
-  (`lib/session-store.ts` getStore seam) against Upstash/Redis/Vercel KV.
+  (`lib/session-store.ts` getStore seam) against Upstash/Redis/Vercel KV before
+  scaling past one instance.
 
-`vercel.json` is minimal (framework auto-detect + build commands). The same
-`package.json` scripts power both targets.
+The `Dockerfile` at `client/Dockerfile` is kept for local/container runs but is
+not the deploy target.
 
 ## Git
 
