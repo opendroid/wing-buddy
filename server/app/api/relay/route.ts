@@ -14,7 +14,7 @@ export const POST = withCors(async (req: Request) => {
   if (!sessionId) {
     return NextResponse.json({ error: "invalid or expired token" }, { status: 401 });
   }
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) {
     return NextResponse.json({ error: "session not found" }, { status: 404 });
   }
@@ -32,7 +32,7 @@ export const POST = withCors(async (req: Request) => {
   const name = body.name?.trim();
   const text = name ? `${name}: ${raw}` : raw;
 
-  const event = appendEvent(session, { type: "family_message", text });
+  const event = await appendEvent(session, { type: "family_message", text });
   return NextResponse.json({ ok: true, seq: event.seq }, { status: 201 });
 });
 

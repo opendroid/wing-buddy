@@ -20,9 +20,11 @@ const FLIGHT: Flight = {
   delayMin: 0,
 };
 
-const mk = (): Session => createSession({ flight: { ...FLIGHT } });
+const mk = () => createSession({ flight: { ...FLIGHT } });
 
-beforeEach(() => __resetStore());
+beforeEach(async () => {
+  await __resetStore();
+});
 
 describe("classifyIntent", () => {
   it("routes the main intents", () => {
@@ -47,7 +49,7 @@ describe("classifyIntent", () => {
 
 describe("handleQuery", () => {
   it("wheelchair → files WCHR, ssr reconfirmed, emits agent_action + ssr_update", async () => {
-    const s = mk();
+    const s = await mk();
     const r = await handleQuery(s, "I need a wheelchair");
     expect(r.intent).toBe("wheelchair");
     expect(s.ssr).toBe("reconfirmed");
@@ -57,8 +59,8 @@ describe("handleQuery", () => {
   });
 
   it("flight_recheck after a silent drop re-adds WCHR → reconfirmed", async () => {
-    const s = mk();
-    mutateSession(s, (x) => {
+    const s = await mk();
+    await mutateSession(s, (x) => {
       x.ssr = "dropped"; // as if /demo/disrupt fired
       x.flight.gate = "22B";
     });
@@ -71,7 +73,7 @@ describe("handleQuery", () => {
   });
 
   it("medical query → declines, no advice, logs the decline", async () => {
-    const s = mk();
+    const s = await mk();
     const r = await handleQuery(s, "how much medicine should I take");
     expect(r.intent).toBe("medical_decline");
     expect(r.answer).toContain("सलाह नहीं दे सकती"); // "cannot advise"
@@ -81,7 +83,7 @@ describe("handleQuery", () => {
   });
 
   it("facilities (water for medicine) → facilities event, not a decline", async () => {
-    const s = mk();
+    const s = await mk();
     const r = await handleQuery(s, "मुझे दवाई के लिए पानी चाहिए");
     expect(r.intent).toBe("facilities");
     const fac = s.events.find((e) => e.type === "facilities");
@@ -89,7 +91,7 @@ describe("handleQuery", () => {
   });
 
   it("ends reassurances with the calm sign-off", async () => {
-    const s = mk();
+    const s = await mk();
     const r = await handleQuery(s, "hello");
     expect(r.answer).toContain("आप ठीक कर रहे हैं");
   });

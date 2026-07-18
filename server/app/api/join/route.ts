@@ -19,7 +19,7 @@ export const POST = withCors(async (req: Request) => {
   // Primary: signed link token.
   if (body.t) {
     const v = verifyAccessToken(body.t);
-    if (!v || !getSession(v.sessionId)) {
+    if (!v || !(await getSession(v.sessionId))) {
       return NextResponse.json({ error: "invalid or expired token" }, { status: 401 });
     }
     return NextResponse.json({ sessionId: v.sessionId, verified: true, t: body.t });
@@ -27,7 +27,7 @@ export const POST = withCors(async (req: Request) => {
 
   // Fallback: shareCode (+ optional PIN).
   if (body.shareCode) {
-    const session = getSessionByShareCode(body.shareCode);
+    const session = await getSessionByShareCode(body.shareCode);
     if (!session) {
       return NextResponse.json({ error: "unknown code" }, { status: 404 });
     }

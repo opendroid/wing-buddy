@@ -69,11 +69,11 @@ export async function handleQuery(
   switch (intent) {
     case "wheelchair": {
       const value = await addSSR(pnr(), "WCHR");
-      mutateSession(session, (s) => {
+      await mutateSession(session, (s) => {
         s.ssr = value;
       });
-      appendEvent(session, { type: "agent_action", label: "Filed wheelchair (WCHR)" });
-      appendEvent(session, { type: "ssr_update", value });
+      await appendEvent(session, { type: "agent_action", label: "Filed wheelchair (WCHR)" });
+      await appendEvent(session, { type: "ssr_update", value });
       return {
         intent,
         answer: `मैंने आपकी व्हीलचेयर की व्यवस्था कर दी है, यह आपके गेट ${session.flight.gate} पर मिलेगी। ${REASSURE}`,
@@ -86,18 +86,18 @@ export async function handleQuery(
       let value = current;
       if (session.ssr === "dropped") {
         value = await addSSR(pnr(), "WCHR");
-        appendEvent(session, {
+        await appendEvent(session, {
           type: "agent_action",
           label: "Re-checked booking; re-added WCHR",
         });
-        appendEvent(session, { type: "ssr_update", value });
+        await appendEvent(session, { type: "ssr_update", value });
       } else {
-        appendEvent(session, {
+        await appendEvent(session, {
           type: "agent_action",
           label: "Re-checked booking; wheelchair OK",
         });
       }
-      mutateSession(session, (s) => {
+      await mutateSession(session, (s) => {
         s.ssr = value;
       });
       return {
@@ -110,13 +110,13 @@ export async function handleQuery(
       const need = detectNeed(query)!;
       const fac = lookupFacility(session.flight.origin, need);
       if (fac) {
-        appendEvent(session, {
+        await appendEvent(session, {
           type: "facilities",
           airport: fac.airport,
           need: fac.need,
           result: fac.result,
         });
-        appendEvent(session, { type: "agent_action", label: `Facilities: ${need}` });
+        await appendEvent(session, { type: "agent_action", label: `Facilities: ${need}` });
         return {
           intent,
           answer: `आपको जो चाहिए वह पास में है — ${fac.result} मैं आपके परिवार को भी बता सकती हूँ। ${REASSURE}`,
@@ -130,7 +130,7 @@ export async function handleQuery(
 
     case "medical_decline": {
       // Never advise on medication/symptoms/dosing. Logistics only.
-      appendEvent(session, {
+      await appendEvent(session, {
         type: "agent_action",
         label: "Declined medical advice; offered facilities + family",
       });
@@ -141,7 +141,7 @@ export async function handleQuery(
     }
 
     case "flight_status": {
-      appendEvent(session, { type: "agent_action", label: "Checked flight status" });
+      await appendEvent(session, { type: "agent_action", label: "Checked flight status" });
       const f = session.flight;
       const statusHi =
         f.status === "delayed"
@@ -156,7 +156,7 @@ export async function handleQuery(
     }
 
     case "notify_family": {
-      appendEvent(session, { type: "agent_action", label: "Offered to notify family" });
+      await appendEvent(session, { type: "agent_action", label: "Offered to notify family" });
       return {
         intent,
         answer: `मैं आपके परिवार को अभी बता देती हूँ। ${REASSURE}`,

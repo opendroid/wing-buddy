@@ -18,7 +18,7 @@ export const GET = withCors(async (req: Request) => {
     );
   }
 
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) {
     return NextResponse.json({ error: "session not found" }, { status: 404 });
   }

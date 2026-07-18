@@ -4,6 +4,7 @@ import * as agentRoute from "@/app/api/agent/route";
 import * as disruptRoute from "@/app/api/demo/disrupt/route";
 import {
   createSession,
+  getSession,
   __resetStore,
   type Flight,
 } from "@/lib/session-store";
@@ -23,7 +24,9 @@ const FLIGHT: Flight = {
 
 const mk = () => createSession({ flight: { ...FLIGHT } });
 
-beforeEach(() => __resetStore());
+beforeEach(async () => {
+  await __resetStore();
+});
 
 async function ask(sessionId: string, key: string | null, query: string) {
   let res: Response;
@@ -45,7 +48,7 @@ async function ask(sessionId: string, key: string | null, query: string) {
 
 describe("POST /api/agent", () => {
   it("wheelchair intent returns Hindi + reconfirms SSR", async () => {
-    const s = mk();
+    const s = await mk();
     const res = await ask(s.sessionId, s.requesterKey, "मुझे व्हीलचेयर चाहिए");
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -55,7 +58,7 @@ describe("POST /api/agent", () => {
   });
 
   it("medical query is declined without advice", async () => {
-    const s = mk();
+    const s = await mk();
     const res = await ask(s.sessionId, s.requesterKey, "how much medicine should I take");
     const body = await res.json();
     expect(body.intent).toBe("medical_decline");
@@ -63,13 +66,13 @@ describe("POST /api/agent", () => {
   });
 
   it("401s without the requesterKey; 404 for unknown session", async () => {
-    const s = mk();
+    const s = await mk();
     expect((await ask(s.sessionId, null, "hi")).status).toBe(401);
     expect((await ask("nope", s.requesterKey, "hi")).status).toBe(404);
   });
 
   it("full gasp cycle: disrupt silently drops SSR, agent re-check flips it back", async () => {
-    const s = mk();
+    const s = await mk();
     const t = signAccessToken(s.sessionId);
 
     // presenter presses `d`
@@ -93,7 +96,9 @@ describe("POST /api/agent", () => {
     expect(body.intent).toBe("flight_recheck");
     expect(body.ssr).toBe("reconfirmed");
     // badge story: ...dropped (silent, via state) -> reconfirmed (ssr_update)
-    const lastSsr = s.events.filter((e) => e.type === "ssr_update").at(-1);
+    const lastSsr = (await getSession(s.sessionId))!.events
+      .filter((e) => e.type === "ssr_update")
+      .at(-1);
     expect(lastSsr).toMatchObject({ value: "reconfirmed" });
   });
 });

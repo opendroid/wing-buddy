@@ -20,7 +20,9 @@ const FLIGHT: Flight = {
   delayMin: 0,
 };
 
-beforeEach(() => __resetStore());
+beforeEach(async () => {
+  await __resetStore();
+});
 
 describe("GET /api/healthz", () => {
   it("returns {ok, sessions}", async () => {
@@ -64,7 +66,7 @@ describe("POST /api/session", () => {
 
 describe("GET /api/voice-token", () => {
   it("mints a token for the requester with a valid x-wb-key", async () => {
-    const s = createSession({ flight: { ...FLIGHT } });
+    const s = await createSession({ flight: { ...FLIGHT } });
     await testApiHandler({
       appHandler: voiceToken,
       url: `/api/voice-token?sessionId=${s.sessionId}&role=requester`,
@@ -82,7 +84,7 @@ describe("GET /api/voice-token", () => {
   });
 
   it("401s the requester without a valid key", async () => {
-    const s = createSession({ flight: { ...FLIGHT } });
+    const s = await createSession({ flight: { ...FLIGHT } });
     await testApiHandler({
       appHandler: voiceToken,
       url: `/api/voice-token?sessionId=${s.sessionId}&role=requester`,
@@ -94,7 +96,7 @@ describe("GET /api/voice-token", () => {
   });
 
   it("401s a joiner without a `t` token, 200 with a valid one", async () => {
-    const s = createSession({ flight: { ...FLIGHT } });
+    const s = await createSession({ flight: { ...FLIGHT } });
 
     await testApiHandler({
       appHandler: voiceToken,
@@ -119,7 +121,7 @@ describe("GET /api/voice-token", () => {
   });
 
   it("400s on a bad role", async () => {
-    const s = createSession({ flight: { ...FLIGHT } });
+    const s = await createSession({ flight: { ...FLIGHT } });
     await testApiHandler({
       appHandler: voiceToken,
       url: `/api/voice-token?sessionId=${s.sessionId}&role=bogus`,

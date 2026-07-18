@@ -5,7 +5,7 @@ import { withCors, corsPreflight } from "@/lib/withCors";
 export const dynamic = "force-dynamic";
 
 export const GET = withCors(async () => {
-  return NextResponse.json({ ok: true, sessions: sessionCount() });
+  return NextResponse.json({ ok: true, sessions: await sessionCount() });
 });
 
 export const OPTIONS = corsPreflight;

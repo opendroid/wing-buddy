@@ -9,6 +9,7 @@ import * as relayRoute from "@/app/api/relay/route";
 
 import {
   createSession,
+  getSession,
   appendEvent,
   __resetStore,
   type Flight,
@@ -29,11 +30,13 @@ const FLIGHT: Flight = {
 
 const mk = () => createSession({ flight: { ...FLIGHT } });
 
-beforeEach(() => __resetStore());
+beforeEach(async () => {
+  await __resetStore();
+});
 
 describe("GET /api/session/[id]/state", () => {
   it("returns a snapshot for a valid requesterKey", async () => {
-    const s = mk();
+    const s = await mk();
     await testApiHandler({
       appHandler: stateRoute,
       params: { sessionId: s.sessionId },
@@ -50,7 +53,7 @@ describe("GET /api/session/[id]/state", () => {
   });
 
   it("accepts a valid `t` token too", async () => {
-    const s = mk();
+    const s = await mk();
     const t = signAccessToken(s.sessionId);
     await testApiHandler({
       appHandler: stateRoute,
@@ -64,7 +67,7 @@ describe("GET /api/session/[id]/state", () => {
   });
 
   it("401s without credentials, 404s for unknown session", async () => {
-    const s = mk();
+    const s = await mk();
     await testApiHandler({
       appHandler: stateRoute,
       params: { sessionId: s.sessionId },
@@ -86,10 +89,10 @@ describe("GET /api/session/[id]/state", () => {
 
 describe("GET /api/session/[id]/events", () => {
   it("returns only events newer than `since`", async () => {
-    const s = mk();
-    appendEvent(s, { type: "agent_action", label: "a" });
-    appendEvent(s, { type: "agent_action", label: "b" });
-    appendEvent(s, { type: "agent_action", label: "c" });
+    const s = await mk();
+    await appendEvent(s, { type: "agent_action", label: "a" });
+    await appendEvent(s, { type: "agent_action", label: "b" });
+    await appendEvent(s, { type: "agent_action", label: "c" });
     await testApiHandler({
       appHandler: eventsRoute,
       params: { sessionId: s.sessionId },
@@ -107,7 +110,7 @@ describe("GET /api/session/[id]/events", () => {
 
 describe("POST /api/session/[id]/transcript", () => {
   it("logs + translates a Hindi line (requesterKey required)", async () => {
-    const s = mk();
+    const s = await mk();
     await testApiHandler({
       appHandler: transcriptRoute,
       params: { sessionId: s.sessionId },
@@ -124,7 +127,7 @@ describe("POST /api/session/[id]/transcript", () => {
         expect(res.status).toBe(201);
       },
     });
-    const ev = s.events.at(-1);
+    const ev = (await getSession(s.sessionId))!.events.at(-1);
     expect(ev?.type).toBe("transcript");
     expect(ev && ev.type === "transcript" && ev.textTranslated).toBe(
       "I need water for my medicine"
@@ -132,7 +135,7 @@ describe("POST /api/session/[id]/transcript", () => {
   });
 
   it("401s without the requesterKey", async () => {
-    const s = mk();
+    const s = await mk();
     await testApiHandler({
       appHandler: transcriptRoute,
       params: { sessionId: s.sessionId },
@@ -150,7 +153,7 @@ describe("POST /api/session/[id]/transcript", () => {
 
 describe("POST /api/demo/disrupt", () => {
   it("gate_change mutates flight + silently drops SSR (no ssr_update event)", async () => {
-    const s = mk();
+    const s = await mk();
     const t = signAccessToken(s.sessionId);
     await testApiHandler({
       appHandler: disruptRoute,
@@ -167,11 +170,12 @@ describe("POST /api/demo/disrupt", () => {
         expect(body.ssr).toBe("dropped");
       },
     });
-    const types = s.events.map((e) => e.type);
+    const after = (await getSession(s.sessionId))!;
+    const types = after.events.map((e) => e.type);
     expect(types).toContain("flight_event");
     expect(types).toContain("flight_update");
     expect(types).not.toContain("ssr_update"); // silent drop
-    expect(s.ssr).toBe("dropped");
+    expect(after.ssr).toBe("dropped");
   });
 
   it("401s with an invalid token", async () => {
@@ -192,7 +196,7 @@ describe("POST /api/demo/disrupt", () => {
 
 describe("POST /api/relay", () => {
   it("appends a family_message event (name prefixed)", async () => {
-    const s = mk();
+    const s = await mk();
     const t = signAccessToken(s.sessionId);
     await testApiHandler({
       appHandler: relayRoute,
@@ -206,7 +210,7 @@ describe("POST /api/relay", () => {
         expect(res.status).toBe(201);
       },
     });
-    const ev = s.events.at(-1);
+    const ev = (await getSession(s.sessionId))!.events.at(-1);
     expect(ev?.type).toBe("family_message");
     expect(ev && ev.type === "family_message" && ev.text).toBe("Raj: Are you okay?");
   });

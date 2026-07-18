@@ -41,7 +41,7 @@ export const POST = withCors(async (req: Request) => {
     flightSource = "fallback";
   }
 
-  const session = createSession({
+  const session = await createSession({
     flight,
     pinHash: pin ? hashPin(pin) : undefined,
   });

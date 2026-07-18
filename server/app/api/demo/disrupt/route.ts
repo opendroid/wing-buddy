@@ -17,7 +17,7 @@ export const POST = withCors(async (req: Request) => {
   if (!sessionId) {
     return NextResponse.json({ error: "invalid or expired token" }, { status: 401 });
   }
-  const session = getSession(sessionId);
+  const session = await getSession(sessionId);
   if (!session) {
     return NextResponse.json({ error: "session not found" }, { status: 404 });
   }
@@ -32,21 +32,21 @@ export const POST = withCors(async (req: Request) => {
 
   if (kind === "gate_change") {
     const newGate = session.flight.gate === "14A" ? "22B" : "14A";
-    mutateSession(session, (s) => {
+    await mutateSession(session, (s) => {
       s.flight.gate = newGate;
       s.ssr = "dropped"; // silent
     });
-    appendEvent(session, { type: "flight_event", kind: "gate_change", gate: newGate });
-    appendEvent(session, { type: "flight_update", kind: "gate_change", gate: newGate });
+    await appendEvent(session, { type: "flight_event", kind: "gate_change", gate: newGate });
+    await appendEvent(session, { type: "flight_update", kind: "gate_change", gate: newGate });
   } else {
     const delayMin = (session.flight.delayMin || 0) + 45;
-    mutateSession(session, (s) => {
+    await mutateSession(session, (s) => {
       s.flight.delayMin = delayMin;
       s.flight.status = "delayed";
       s.ssr = "dropped"; // silent
     });
-    appendEvent(session, { type: "flight_event", kind: "delay", delayMin });
-    appendEvent(session, { type: "flight_update", kind: "delay", delayMin });
+    await appendEvent(session, { type: "flight_event", kind: "delay", delayMin });
+    await appendEvent(session, { type: "flight_update", kind: "delay", delayMin });
   }
 
   return NextResponse.json({

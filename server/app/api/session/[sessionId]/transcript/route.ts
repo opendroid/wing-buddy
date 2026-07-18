@@ -11,7 +11,7 @@ type Role = "traveler" | "agent" | "joiner";
 export const POST = withCors(
   async (req: Request, ctx: { params: Promise<{ sessionId: string }> }) => {
     const { sessionId } = await ctx.params;
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
     if (!session) {
       return NextResponse.json({ error: "session not found" }, { status: 404 });
     }
@@ -43,7 +43,7 @@ export const POST = withCors(
       if (r.translated) textTranslated = r.text;
     }
 
-    const event = appendEvent(session, {
+    const event = await appendEvent(session, {
       type: "transcript",
       role,
       lang,

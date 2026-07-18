@@ -23,60 +23,62 @@ const FLIGHT: Flight = {
   delayMin: 0,
 };
 
-beforeEach(() => __resetStore());
+beforeEach(async () => {
+  await __resetStore();
+});
 
 describe("session-store", () => {
-  it("creates sessions with unique ids, a room name, key and share code", () => {
-    const a = createSession({ flight: { ...FLIGHT } });
-    const b = createSession({ flight: { ...FLIGHT } });
+  it("creates sessions with unique ids, a room name, key and share code", async () => {
+    const a = await createSession({ flight: { ...FLIGHT } });
+    const b = await createSession({ flight: { ...FLIGHT } });
     expect(a.sessionId).not.toBe(b.sessionId);
     expect(a.roomName).toMatch(/^wingbuddy-/);
     expect(a.requesterKey).toBeTruthy();
     expect(a.shareCode).toHaveLength(6);
     expect(a.ssr).toBe("none");
-    expect(sessionCount()).toBe(2);
+    expect(await sessionCount()).toBe(2);
   });
 
-  it("get miss returns undefined", () => {
-    expect(getSession("nope")).toBeUndefined();
+  it("get miss returns undefined", async () => {
+    expect(await getSession("nope")).toBeUndefined();
   });
 
-  it("mutate flows through the callback", () => {
-    const s = createSession({ flight: { ...FLIGHT } });
-    mutateSession(s, (x) => {
+  it("mutate flows through the callback", async () => {
+    const s = await createSession({ flight: { ...FLIGHT } });
+    await mutateSession(s, (x) => {
       x.ssr = "dropped";
       x.presence.joiner = true;
     });
-    expect(getSession(s.sessionId)?.ssr).toBe("dropped");
-    expect(getSession(s.sessionId)?.presence.joiner).toBe(true);
+    expect((await getSession(s.sessionId))?.ssr).toBe("dropped");
+    expect((await getSession(s.sessionId))?.presence.joiner).toBe(true);
   });
 });
 
 describe("events", () => {
-  it("assigns strictly monotonic seq and timestamps", () => {
-    const s = createSession({ flight: { ...FLIGHT } });
-    const e1 = appendEvent(s, { type: "agent_action", label: "one" });
-    const e2 = appendEvent(s, { type: "ssr_update", value: "confirmed" });
+  it("assigns strictly monotonic seq and timestamps", async () => {
+    const s = await createSession({ flight: { ...FLIGHT } });
+    const e1 = await appendEvent(s, { type: "agent_action", label: "one" });
+    const e2 = await appendEvent(s, { type: "ssr_update", value: "confirmed" });
     expect(e1.seq).toBe(1);
     expect(e2.seq).toBe(2);
     expect(e2.ts).toBeGreaterThanOrEqual(e1.ts);
     expect(s.seq).toBe(2);
   });
 
-  it("eventsSince returns only events newer than `since`", () => {
-    const s = createSession({ flight: { ...FLIGHT } });
-    appendEvent(s, { type: "agent_action", label: "a" });
-    appendEvent(s, { type: "agent_action", label: "b" });
-    appendEvent(s, { type: "agent_action", label: "c" });
+  it("eventsSince returns only events newer than `since`", async () => {
+    const s = await createSession({ flight: { ...FLIGHT } });
+    await appendEvent(s, { type: "agent_action", label: "a" });
+    await appendEvent(s, { type: "agent_action", label: "b" });
+    await appendEvent(s, { type: "agent_action", label: "c" });
     const after1 = eventsSince(s, 1);
     expect(after1.map((e) => e.seq)).toEqual([2, 3]);
     expect(eventsSince(s, 3)).toEqual([]);
   });
 
-  it("caps the event log at MAX_EVENTS, dropping the oldest, seq stays monotonic", () => {
-    const s = createSession({ flight: { ...FLIGHT } });
+  it("caps the event log at MAX_EVENTS, dropping the oldest, seq stays monotonic", async () => {
+    const s = await createSession({ flight: { ...FLIGHT } });
     for (let i = 0; i < MAX_EVENTS + 25; i++) {
-      appendEvent(s, { type: "agent_action", label: `e${i}` });
+      await appendEvent(s, { type: "agent_action", label: `e${i}` });
     }
     expect(s.events.length).toBe(MAX_EVENTS);
     // oldest dropped: first retained seq is 26

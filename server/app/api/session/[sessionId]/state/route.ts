@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const GET = withCors(
   async (req: Request, ctx: { params: Promise<{ sessionId: string }> }) => {
     const { sessionId } = await ctx.params;
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
     if (!session) {
       return NextResponse.json({ error: "session not found" }, { status: 404 });
     }

@@ -20,7 +20,9 @@ const FLIGHT: Flight = {
   delayMin: 0,
 };
 
-beforeEach(() => __resetStore());
+beforeEach(async () => {
+  await __resetStore();
+});
 
 async function post(body: unknown) {
   let out: Response;
@@ -39,7 +41,7 @@ async function post(body: unknown) {
 
 describe("POST /api/join", () => {
   it("verifies a valid signed `t` link", async () => {
-    const s = createSession({ flight: { ...FLIGHT } });
+    const s = await createSession({ flight: { ...FLIGHT } });
     const res = await post({ t: signAccessToken(s.sessionId) });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -52,7 +54,7 @@ describe("POST /api/join", () => {
   });
 
   it("verifies via shareCode with no PIN and mints a fresh `t`", async () => {
-    const s = createSession({ flight: { ...FLIGHT } });
+    const s = await createSession({ flight: { ...FLIGHT } });
     const res = await post({ shareCode: s.shareCode.toLowerCase() });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -61,7 +63,7 @@ describe("POST /api/join", () => {
   });
 
   it("requires the correct PIN when one is set", async () => {
-    const s = createSession({ flight: { ...FLIGHT }, pinHash: hashPin("4242") });
+    const s = await createSession({ flight: { ...FLIGHT }, pinHash: hashPin("4242") });
     expect((await post({ shareCode: s.shareCode })).status).toBe(401);
     expect((await post({ shareCode: s.shareCode, pin: "0000" })).status).toBe(401);
     const ok = await post({ shareCode: s.shareCode, pin: "4242" });
