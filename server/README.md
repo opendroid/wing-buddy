@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WingBuddy — Server
 
-## Getting Started
+Backend for WingBuddy (AI voice agent bridging a Hindi-speaking traveler, a
+remote family member, and the airline). **API only — no UI**; the client app
+lives in `../client`. Next.js (App Router) route handlers + `lib/` modules.
 
-First, run the development server:
+Real integrations: **Sabre** (flight data via InstaFlights), **Vocal Bridge**
+(hosted Hindi agent + token mint), **Anthropic** (hi↔en translation).
+
+## Quick start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # fill in real values (see the table below / .env.example)
+npm run dev                  # http://localhost:8080  (or: npm run build && npm start)
+npm test                     # 56 hermetic tests (Vitest + MSW), no live services
+npm run typecheck            # tsc --noEmit
+bash scripts/smoke.sh        # end-to-end curl harness against a running server
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Environment variables are documented (names only) in `.env.example`. Real
+values go in `.env.local` (gitignored) — never in `.env.example`, which is
+committed to a public repo.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Endpoints (10)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`POST /api/session` · `GET /api/voice-token` · `POST /api/join` ·
+`POST /api/agent` (the brain) · `GET /api/session/[id]/state` ·
+`GET /api/session/[id]/events?since=` · `POST /api/session/[id]/transcript` ·
+`POST /api/demo/disrupt` · `POST /api/relay` · `GET /api/healthz`.
 
-## Learn More
+## ⚠️ Session store caveat (read before deploying to Vercel)
 
-To learn more about Next.js, take a look at the following resources:
+`lib/session-store.ts` is a **dual backend** behind one async interface:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Upstash Redis** — when `UPSTASH_REDIS_REST_URL` **and** `UPSTASH_REDIS_REST_TOKEN`
+  are set. Durable; safe across instances. Use this for anything real.
+- **In-memory `Map`** — the fallback when those are unset.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**The in-memory fallback does NOT work reliably on Vercel serverless.** Vercel
+functions are stateless and don't share memory between invocations, and there
+is no `min=max=1` single-instance knob. A session created on one instance is
+invisible to the next — so the requester's poll loop, the joiner's `/state`,
+and `/api/agent` (which all fire concurrently) can hit a different instance and
+get **"session not found"** mid-demo.
 
-## Deploy on Vercel
+**For this hackathon we're accepting that risk:** the demo is a single ~3-minute
+run, so one warm instance will usually serve the whole session — but it is not
+guaranteed (concurrency or a cold start can still split it).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+If it misbehaves during rehearsal, three fixes in increasing durability:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Set the two `UPSTASH_*` vars** (create a free Upstash Redis DB) — the
+   durable fix; the seam is already there, no code change.
+2. **`?demo=1` scripted mode** — replays the full arc with no server state at all.
+3. **Run on a single always-on instance** (Cloud Run `min=max=1`, Railway,
+   Render) instead of Vercel serverless — where in-memory genuinely works.
+
+## Deploy (Vercel, from GitHub)
+
+- Set the Vercel project **Root Directory to `server/`**.
+- Add the env vars from `.env.example` (fill real values). Leaving `UPSTASH_*`
+  blank selects the in-memory store — see the caveat above.
+- Deploy from `main`, then validate: `BASE_URL=https://…yourserver bash scripts/smoke.sh`.
