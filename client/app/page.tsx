@@ -23,8 +23,8 @@ export default function Home() {
           with the airline for you — and your family can follow along.
         </p>
         <p className="text-sm leading-5 text-text-muted">
-          This is an AI assistant. Your family can see this conversation if you
-          share the link.
+          This is an AI assistant. Family can follow along when you text them
+          the invite — no codes to read aloud.
         </p>
       </header>
 

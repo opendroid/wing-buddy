@@ -3,7 +3,6 @@
 import { useState, useRef } from "react";
 import { VocalBridge, ConnectionState } from "@vocalbridgeai/sdk";
 import BigCallButton from "@/components/BigCallButton";
-import PinToggle from "@/components/PinToggle";
 import ShareSheet from "@/components/ShareSheet";
 import { forwardTranscript } from "@/lib/forward-transcript";
 
@@ -21,17 +20,12 @@ interface CreatedSession {
   requesterKey: string;
 }
 
-function randomPin(): string {
-  return String(1000 + Math.floor(Math.random() * 9000));
-}
-
 export default function HelpClient() {
   const [state, setState] = useState<CallState>("idle");
-  const [pinEnabled, setPinEnabled] = useState(false);
-  const [pin, setPin] = useState<string | undefined>();
   const [session, setSession] = useState<CreatedSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [voiceWarning, setVoiceWarning] = useState<string | null>(null);
+  const [familyInvited, setFamilyInvited] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const vbRef = useRef<VocalBridge | null>(null);
   const lastAgentLineRef = useRef<string>("");
@@ -67,6 +61,7 @@ export default function HelpClient() {
     if (state !== "idle") return;
     setError(null);
     setVoiceWarning(null);
+    setFamilyInvited(false);
     setState("requesting-mic");
 
     try {
@@ -74,20 +69,19 @@ export default function HelpClient() {
       streamRef.current = stream;
     } catch {
       setError(
-        "Microphone access is needed to talk with the advocate. Please allow microphone access and try again."
+        "Microphone access is needed so your advocate can hear you. Please allow it and try again."
       );
       setState("idle");
       return;
     }
 
     setState("connecting");
-    const nextPin = pinEnabled ? randomPin() : undefined;
 
     try {
       const res = await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(nextPin ? { pin: nextPin } : {}),
+        body: JSON.stringify({}),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -113,7 +107,6 @@ export default function HelpClient() {
         requesterKey: data.requesterKey,
       };
       setSession(created);
-      setPin(nextPin);
 
       // Release the permission probe so LiveKit can own the mic.
       if (streamRef.current) {
@@ -124,7 +117,6 @@ export default function HelpClient() {
       const voiceOk = await connectVoice(created);
       setState("connected");
       if (!voiceOk) {
-        // Session/share still usable; voiceWarning already set in connectVoice.
         console.error("[voice] connected session without live agent");
       }
     } catch (e) {
@@ -135,7 +127,6 @@ export default function HelpClient() {
         streamRef.current = null;
       }
       setSession(null);
-      setPin(undefined);
       setState("idle");
     }
   }
@@ -181,7 +172,6 @@ export default function HelpClient() {
       },
       participantName: "requester",
       sessionId: created.sessionId,
-      debug: true,
     });
 
     vb.on("transcript", (entry) => {
@@ -208,7 +198,6 @@ export default function HelpClient() {
         const answer =
           body.answer?.trim() ||
           "मैं अभी जाँच कर रही हूँ। आप ठीक हैं।";
-        // Log brain reply for the joiner even if VB never emits a TTS transcript.
         void postLine(created, "agent", answer);
         return answer;
       } catch {
@@ -237,11 +226,10 @@ export default function HelpClient() {
       } catch {
         /* ignore */
       }
-      // Session + share still work; joiner won't see live speech without voice.
       setVoiceWarning(
         e instanceof Error
           ? e.message
-          : "Voice could not connect — share still works, transcript needs voice."
+          : "Voice could not connect — you can still text family to follow along."
       );
       return false;
     }
@@ -265,8 +253,8 @@ export default function HelpClient() {
       streamRef.current = null;
     }
     setSession(null);
-    setPin(undefined);
     setVoiceWarning(null);
+    setFamilyInvited(false);
     setState("idle");
   }
 
@@ -275,43 +263,55 @@ export default function HelpClient() {
       ? `${window.location.origin}/room/${session.sessionId}?t=${encodeURIComponent(session.t)}`
       : undefined;
 
+  const idle = state === "idle";
+  const live = state === "connected" && session;
+
   return (
-    <>
+    <div
+      className={`flex w-full max-w-sm flex-col items-center transition-[gap] duration-400 ease-standard ${
+        live ? "gap-8" : "gap-6"
+      }`}
+    >
+      {idle && (
+        <header className="text-center">
+          <h1 className="text-xxl font-semibold tracking-tight text-text">
+            You&rsquo;re not alone
+          </h1>
+          <p className="mt-2 text-base leading-6 text-text-muted">
+            One tap. An advocate speaks Hindi with the airline for you.
+            When you&rsquo;re ready, text family so they can follow along —
+            no codes to remember.
+          </p>
+        </header>
+      )}
+
+      {live && (
+        <p className="sr-only" role="status" aria-live="polite">
+          Connected to your advocate
+        </p>
+      )}
+
       <BigCallButton state={state} onTap={onTap} onEnd={onEnd} />
 
-      {state === "idle" && (
-        <div className="w-full max-w-sm rounded-lg bg-card p-4 shadow-card">
-          <PinToggle enabled={pinEnabled} onChange={setPinEnabled} />
+      {live && shareUrl && (
+        <div className="flex w-full flex-col items-center gap-3">
+          {!familyInvited && (
+            <p className="max-w-[18rem] text-center text-sm leading-5 text-text-muted">
+              When you can, send one message so family can watch with you.
+            </p>
+          )}
+          <ShareSheet
+            url={shareUrl}
+            autoOpen
+            onShared={() => setFamilyInvited(true)}
+          />
         </div>
       )}
 
-      {state === "connected" && session && (
-        <div className="flex w-full max-w-sm flex-col items-center gap-4">
-          <p className="text-center text-sm text-text-muted">
-            Share this link so your family can follow along.
-          </p>
-          {session.shareCode && (
-            <p className="text-center text-sm text-text">
-              Code:{" "}
-              <span className="font-semibold tracking-wider">
-                {session.shareCode}
-              </span>
-              {pin ? (
-                <>
-                  {" "}
-                  · PIN:{" "}
-                  <span className="font-semibold tracking-wider">{pin}</span>
-                </>
-              ) : null}
-            </p>
-          )}
-          <ShareSheet url={shareUrl} />
-          {voiceWarning && (
-            <p role="status" className="text-center text-xs text-warning">
-              {voiceWarning}
-            </p>
-          )}
-        </div>
+      {voiceWarning && (
+        <p role="status" className="max-w-sm text-center text-xs text-warning">
+          {voiceWarning}
+        </p>
       )}
 
       {error && (
@@ -319,6 +319,6 @@ export default function HelpClient() {
           {error}
         </p>
       )}
-    </>
+    </div>
   );
 }

@@ -27,7 +27,7 @@ export default function JoinClient() {
       if (!res.ok || !data.sessionId || !data.t) {
         throw new Error(
           data.error === "unknown code"
-            ? "That code wasn’t found. Ask the traveler to share again."
+            ? "We couldn’t find that session. Try the link they texted you."
             : data.error === "invalid PIN"
               ? "Incorrect PIN."
               : data.error || `Could not join (${res.status})`
