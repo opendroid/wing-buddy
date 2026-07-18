@@ -8,15 +8,11 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
 sdist/
 var/
 wheels/
@@ -27,6 +23,7 @@ share/python-wheels/
 MANIFEST
 
 # PyInstaller
+#   NOTE: top-level lib/ lib64/ parts/ removed below to avoid shadowing the TS source `lib/`.
 #   Usually these files are written by a python script from a template
 #   before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
@@ -216,3 +213,31 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---------------------------------------------------------------------------
+# Next.js / WingBuddy frontend (appended for Hour 1 scaffold)
+# ---------------------------------------------------------------------------
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+build/
+
+# TypeScript / Next generated
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment files — keep .env.example tracked, ignore all real secrets
+.env
+.env.*
+!.env.example
+
+# Local data dir (session store fallback, logs)
+data/
+
+# Vercel / Cloud Run artifacts
+.vercel
+Dockerfile*  # keep Dockerfile tracked; ignore only accidental copies
+
