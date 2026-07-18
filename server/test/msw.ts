@@ -30,6 +30,33 @@ export const handlers = [
     })
   ),
 
+  // Sabre InstaFlights (lib/sabre.ts real seedFlight).
+  http.get(/\/v1\/shop\/flights/, () =>
+    HttpResponse.json({
+      PricedItineraries: [
+        {
+          AirItinerary: {
+            OriginDestinationOptions: {
+              OriginDestinationOption: [
+                {
+                  FlightSegment: [
+                    {
+                      DepartureAirport: { LocationCode: "JFK" },
+                      ArrivalAirport: { LocationCode: "LAX" },
+                      MarketingAirline: { Code: "B6" },
+                      FlightNumber: 3212,
+                      DepartureDateTime: "2026-08-15T17:50:00",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    })
+  ),
+
   // Anthropic Messages API (lib/translate.ts fallback).
   http.post("https://api.anthropic.com/v1/messages", () =>
     HttpResponse.json({
