@@ -22,12 +22,19 @@ export async function mintVoiceToken(params: {
   const apiKey = process.env.VOICE_BRIDGE_WINGBUDDY;
   if (!apiKey) throw new Error("VOICE_BRIDGE_WINGBUDDY is not set");
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-API-Key": apiKey,
+  };
+  // VOICE_BRIDGE_WINGBUDDY is an ACCOUNT key — VB requires the target agent id
+  // as a header on the token mint (confirmed live: "X-Agent-Id header required
+  // when using an account API key"). An agent-scoped key would not need this.
+  const agentId = process.env.VB_AGENT_ID;
+  if (agentId) headers["X-Agent-Id"] = agentId;
+
   const res = await fetch(VB_TOKEN_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": apiKey,
-    },
+    headers,
     body: JSON.stringify({
       participant_name: params.participantName,
       room_name: params.roomName,

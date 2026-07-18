@@ -23,8 +23,9 @@ describe("translate", () => {
     expect(r.text).toBe("मैं यहाँ आपकी मदद के लिए हूँ");
   });
 
-  it("passes through unmapped text (translated=false) until M3 Anthropic path", async () => {
+  it("falls back to the Anthropic API for unmapped text (mocked)", async () => {
     const r = await translate("some unmapped sentence", "en", "hi");
-    expect(r).toEqual({ text: "some unmapped sentence", translated: false });
+    expect(r.translated).toBe(true);
+    expect(r.text).toBe("[[translated]]");
   });
 });

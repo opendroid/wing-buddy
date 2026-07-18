@@ -29,6 +29,19 @@ export const handlers = [
       expires_in: 604800,
     })
   ),
+
+  // Anthropic Messages API (lib/translate.ts fallback).
+  http.post("https://api.anthropic.com/v1/messages", () =>
+    HttpResponse.json({
+      id: "msg_test",
+      type: "message",
+      role: "assistant",
+      model: "claude-haiku-4-5",
+      content: [{ type: "text", text: "[[translated]]" }],
+      stop_reason: "end_turn",
+      usage: { input_tokens: 1, output_tokens: 1 },
+    })
+  ),
 ];
 
 export const server = setupServer(...handlers);
