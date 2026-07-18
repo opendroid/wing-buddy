@@ -1,65 +1,89 @@
-import Image from "next/image";
+import Link from "next/link";
+
+interface ChoiceCardProps {
+  href: string;
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  cta: string;
+  accent: string;
+}
+
+function ChoiceCard({ href, title, subtitle, icon, cta, accent }: ChoiceCardProps) {
+  return (
+    <Link
+      href={href}
+      aria-label={`${title}. ${subtitle}`}
+      className="group relative flex w-full max-w-sm flex-col items-start gap-6 rounded-xl bg-card p-8 shadow-card outline-none transition-[transform,box-shadow] duration-250 ease-[cubic-bezier(0.4,0,0.2,1)] hover:-translate-y-0.5 hover:shadow-card-hover focus-visible:ring-2 focus-visible:ring-accent active:scale-[0.98]"
+    >
+      <span
+        aria-hidden
+        className="flex h-14 w-14 items-center justify-center rounded-full text-2xl"
+        style={{ backgroundColor: `${accent}1a`, color: accent }}
+      >
+        {icon}
+      </span>
+      <div className="flex flex-col gap-2">
+        <h2 className="text-xxl font-semibold tracking-tight text-text">{title}</h2>
+        <p className="text-base leading-6 text-text-muted">{subtitle}</p>
+      </div>
+      <span
+        className="mt-2 inline-flex items-center gap-1 text-base font-medium"
+        style={{ color: accent }}
+      >
+        {cta}
+        <span aria-hidden className="transition-transform duration-250 ease-[cubic-bezier(0.4,0,0.2,1)] group-hover:translate-x-0.5">
+          →
+        </span>
+      </span>
+    </Link>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center gap-12 px-6 py-16">
+      <header className="flex flex-col items-center gap-3 text-center">
+        <span
+          aria-hidden
+          className="mb-1 text-4xl"
+        >
+          🛟
+        </span>
+        <h1 className="text-hero font-semibold tracking-tight text-text">
+          WingBuddy
+        </h1>
+        <p className="max-w-md text-lg leading-7 text-text-muted">
+          Help at the airport, in any language. Get a calm AI advocate on your
+          side — and bring your family into the conversation.
+        </p>
+      </header>
+
+      <section
+        aria-label="Choose how to start"
+        className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2"
+      >
+        <ChoiceCard
+          href="/help"
+          title="Request help"
+          subtitle="One tap connects you to a Hindi-speaking AI advocate who can talk to the airline for you."
+          icon="🎙️"
+          cta="Tap to get help"
+          accent="#007AFF"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+        <ChoiceCard
+          href="/join"
+          title="Join a call"
+          subtitle="Open a link a traveler shared with you to follow along and speak when they need you."
+          icon="👪"
+          cta="Join the conversation"
+          accent="#34C759"
+        />
+      </section>
+
+      <footer className="text-sm text-text-muted">
+        Live translation · Real-time status · Your family can see the conversation.
+      </footer>
+    </main>
   );
 }
