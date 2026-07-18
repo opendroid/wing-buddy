@@ -4,7 +4,9 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 //  - `t`: HMAC over `sessionId|exp`, verified without server state.
 //  - requesterKey: opaque random key returned once by POST /api/session.
 
-const DEFAULT_TTL_MS = 15 * 60 * 1000; // 15 minutes
+// Long enough for mid-call family joins during a live session (session store
+// TTL is 24h). Links shared at the start of a call must still work later.
+const DEFAULT_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 function secret(): string {
   const s = process.env.ACCESS_TOKEN_SECRET;

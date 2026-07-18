@@ -14,7 +14,7 @@ export default function JoinedBanner({ visible, name }: JoinedBannerProps) {
       className="flex items-center gap-2 rounded-full bg-success/10 px-4 py-2 text-sm font-medium text-success"
     >
       <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-success" />
-      {name ? `${name} joined the call` : "Someone joined the call"}
+      {name ? `${name} is following along` : "Someone is following along"}
     </div>
   );
 }

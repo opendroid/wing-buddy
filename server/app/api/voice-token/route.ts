@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/session-store";
+import { getSession, appendEvent, mutateSession } from "@/lib/session-store";
 import { verifyRequesterKey, verifyAccessToken } from "@/lib/access";
 import { mintVoiceToken } from "@/lib/vocalbridge";
 
@@ -41,6 +41,19 @@ export async function GET(req: Request) {
       participantName: role,
       roomName: session.roomName,
     });
+
+    // Traveler connected to voice → family mid-joiners see "Traveler is connected".
+    if (role === "requester" && !session.presence.requester) {
+      await mutateSession(session, (s) => {
+        s.presence.requester = true;
+      });
+      await appendEvent(session, {
+        type: "presence",
+        who: "requester",
+        kind: "joined",
+      });
+    }
+
     // SDK TokenResponse: url (or livekit_url), token, room_name, …
     // Plus legacy camelCase aliases used by older clients/tests.
     return NextResponse.json({

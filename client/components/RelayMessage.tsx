@@ -41,7 +41,7 @@ export default function RelayMessage({ token }: RelayMessageProps) {
     <div className="w-full max-w-md">
       <div className="flex flex-col gap-2">
         <label className="text-xs font-medium text-text-muted" htmlFor="relay-input">
-          Send a message to the traveler
+          Message the traveler (via advocate)
         </label>
         <div className="flex items-center gap-2">
           <input
@@ -74,7 +74,8 @@ export default function RelayMessage({ token }: RelayMessageProps) {
           <p role="alert" className="text-xs text-danger">Could not send. Try again.</p>
         )}
         <p className="text-xs text-text-muted">
-          The AI advocate will relay your message to the traveler in Hindi.
+          You&rsquo;re following along — not on the voice call. The AI advocate
+          will relay your message to the traveler in Hindi.
         </p>
       </div>
     </div>

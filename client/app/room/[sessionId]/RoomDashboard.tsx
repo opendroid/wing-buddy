@@ -7,7 +7,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Transcript, { type TranscriptLine } from "@/components/Transcript";
 import StatusCard from "@/components/StatusCard";
 import AgentActionLog from "@/components/AgentActionLog";
@@ -106,6 +106,18 @@ function applyEvents(
         },
       ]);
     }
+    // Relayed family text also appears in the live log (joiner's own words).
+    if (ev.type === "family_message" && ev.text) {
+      setLines((prev) => [
+        ...prev,
+        {
+          seq: ev.seq,
+          role: "joiner",
+          lang: "en",
+          text: ev.text!,
+        },
+      ]);
+    }
     if (ev.type === "agent_action" && ev.label) {
       setActions((prev) => [...prev, ev.label!]);
     }
@@ -124,43 +136,98 @@ function applyEvents(
         return { ...prev, flight };
       });
     }
-    if (ev.type === "presence" && ev.who === "requester") {
-      setState((prev) =>
-        prev
-          ? {
-              ...prev,
-              presence: {
-                ...prev.presence,
-                requester: ev.kind === "joined",
-              },
-            }
-          : prev
-      );
+    if (ev.type === "presence") {
+      setState((prev) => {
+        if (!prev) return prev;
+        const presence = { ...prev.presence };
+        if (ev.who === "requester") {
+          presence.requester = ev.kind === "joined";
+        }
+        if (ev.who === "joiner") {
+          presence.joiner = ev.kind === "joined";
+        }
+        return { ...prev, presence };
+      });
     }
   }
 }
 
 export default function RoomDashboard({ sessionId }: { sessionId: string }) {
   const searchParams = useSearchParams();
-  const t = searchParams.get("t") ?? "";
+  const router = useRouter();
+  const tParam = searchParams.get("t") ?? "";
 
+  const [token, setToken] = useState(tParam);
   const [state, setState] = useState<SessionState | null>(null);
   const [lines, setLines] = useState<TranscriptLine[]>([]);
   const [actions, setActions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const bootstrappedRef = useRef(false);
 
   // Late-joiner replay: always poll from seq 0 so prior transcript lines appear.
   const sinceRef = useRef(0);
   const seenSeqRef = useRef(new Set<number>());
 
+  // Refresh / verify access via /api/join so mid-call links get a fresh TTL.
+  useEffect(() => {
+    if (!tParam) {
+      setError("Missing access link. Open the message they texted you, or join with a code.");
+      return;
+    }
+    // Avoid re-join loop when router.replace updates `t` in the URL.
+    if (bootstrappedRef.current) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/join", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ t: tParam }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          t?: string;
+          sessionId?: string;
+        };
+        if (!res.ok || !data.t) {
+          throw new Error(
+            data.error === "invalid or expired token"
+              ? "This link expired. Ask them to text you again, or join with the session code."
+              : data.error || `Could not join (${res.status})`
+          );
+        }
+        if (cancelled) return;
+        bootstrappedRef.current = true;
+        setToken(data.t);
+        setReady(true);
+        setError(null);
+        if (data.t !== tParam) {
+          const demo = searchParams.get("demo") === "1" ? "&demo=1" : "";
+          router.replace(
+            `/room/${sessionId}?t=${encodeURIComponent(data.t)}${demo}`
+          );
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Could not join session");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, tParam, router, searchParams]);
+
   // Initial hydrate from /state
   useEffect(() => {
-    if (!t) return;
+    if (!ready || !token) return;
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch(
-          `/api/session/${sessionId}/state?t=${encodeURIComponent(t)}`
+          `/api/session/${sessionId}/state?t=${encodeURIComponent(token)}`
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -186,16 +253,16 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, t]);
+  }, [sessionId, token, ready]);
 
   // Poll event log every 1.5s (and once immediately after hydrate)
   useEffect(() => {
-    if (!t || error || !state) return;
+    if (!ready || !token || error || !state) return;
 
     async function poll() {
       try {
         const res = await fetch(
-          `/api/session/${sessionId}/events?since=${sinceRef.current}&t=${encodeURIComponent(t)}`
+          `/api/session/${sessionId}/events?since=${sinceRef.current}&t=${encodeURIComponent(token)}`
         );
         if (!res.ok) return;
         const data = (await res.json()) as {
@@ -215,17 +282,17 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
     void poll();
     const id = setInterval(poll, 1500);
     return () => clearInterval(id);
-  }, [sessionId, t, error, state]);
+  }, [sessionId, token, error, state, ready]);
 
   if (error) {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-lg flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-        <h1 className="text-xl font-semibold text-text">Can’t open this call</h1>
+        <h1 className="text-xl font-semibold text-text">Can’t open this session</h1>
         <p role="alert" className="text-sm text-danger">
           {error}
         </p>
         <a href="/join" className="text-sm font-medium text-accent underline">
-          Try joining with a code
+          Join with a code instead
         </a>
       </main>
     );
@@ -234,7 +301,7 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
   if (!state) {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-lg items-center justify-center px-6 py-16">
-        <p className="text-text-muted">Loading session…</p>
+        <p className="text-text-muted">Joining live session…</p>
       </main>
     );
   }
@@ -246,17 +313,26 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
       : "success";
 
   const isDemo = searchParams.get("demo") === "1";
+  const travelerLive = state.presence.requester;
 
   return (
     <main className="mx-auto flex min-h-[100svh] w-full max-w-6xl flex-col gap-6 px-6 py-10">
-      <header className="flex items-center justify-between">
-        <div className="flex flex-col">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-1">
+          <p className="text-xs font-medium uppercase tracking-wide text-success">
+            {travelerLive ? "Following live" : "Waiting for traveler"}
+          </p>
           <h1 className="text-xl font-semibold tracking-tight text-text">
             {state.flight.carrier} {state.flight.number} &middot;{" "}
             {state.flight.origin}&rarr;{state.flight.dest}
           </h1>
           <p className="text-sm text-text-muted">
             {state.flight.date} &middot; Gate {state.flight.gate}
+          </p>
+          <p className="mt-1 max-w-md text-sm leading-5 text-text-muted">
+            You’re following the conversation in real time — including what
+            happened before you joined. Send a message below; the advocate will
+            relay it in Hindi.
           </p>
         </div>
         {isDemo && <DemoOverride />}
@@ -273,11 +349,11 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
         <aside className="flex flex-col gap-3">
           <StatusCard
             title={
-              state.presence.requester
+              travelerLive
                 ? "Traveler is connected"
                 : "Waiting for traveler"
             }
-            tone={state.presence.requester ? "success" : "neutral"}
+            tone={travelerLive ? "success" : "neutral"}
           />
           <StatusCard
             title={`Flight ${state.flight.status.replace("_", " ")}`}
@@ -295,7 +371,7 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
       </div>
 
       <div className="flex justify-center">
-        <RelayMessage token={t} />
+        <RelayMessage token={token} />
       </div>
 
       {isDemo && (

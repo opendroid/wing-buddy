@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { VocalBridge, ConnectionState } from "@vocalbridgeai/sdk";
 import BigCallButton from "@/components/BigCallButton";
 import ShareSheet from "@/components/ShareSheet";
+import JoinedBanner from "@/components/JoinedBanner";
 import Transcript, { type TranscriptLine } from "@/components/Transcript";
 import { forwardTranscript } from "@/lib/forward-transcript";
 
@@ -32,10 +33,74 @@ export default function HelpClient() {
   const vbRef = useRef<VocalBridge | null>(null);
   const lastAgentLineRef = useRef<string>("");
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  const eventSinceRef = useRef(0);
+  const [familyJoined, setFamilyJoined] = useState(false);
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [lines]);
+
+  // Bridge: poll server events → app→agent client actions (CLAUDE.md rule 4b).
+  useEffect(() => {
+    if (state !== "connected" || !session) return;
+    const created = session;
+
+    async function pollServerEvents() {
+      const vb = vbRef.current;
+      try {
+        const res = await fetch(
+          `/api/session/${created.sessionId}/events?since=${eventSinceRef.current}`,
+          { headers: { "x-wb-key": created.requesterKey } }
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          events?: Array<{
+            type: string;
+            seq: number;
+            text?: string;
+            kind?: string;
+            gate?: string;
+            delayMin?: number;
+            who?: string;
+          }>;
+          seq?: number;
+        };
+        const events = data.events ?? [];
+        if (events.length === 0) return;
+        eventSinceRef.current = data.seq ?? events[events.length - 1]!.seq;
+
+        for (const ev of events) {
+          if (ev.type === "presence" && ev.who === "joiner" && ev.kind === "joined") {
+            setFamilyJoined(true);
+          }
+          if (!vb) continue;
+          if (ev.type === "family_message" && ev.text) {
+            try {
+              await vb.sendAction("family_message", { text: ev.text });
+            } catch (e) {
+              console.error("[family_message]", e);
+            }
+          } else if (ev.type === "flight_update") {
+            try {
+              await vb.sendAction("flight_update", {
+                kind: ev.kind,
+                gate: ev.gate,
+                delayMin: ev.delayMin,
+              });
+            } catch (e) {
+              console.error("[flight_update]", e);
+            }
+          }
+        }
+      } catch {
+        /* ignore transient poll errors */
+      }
+    }
+
+    void pollServerEvents();
+    const id = setInterval(pollServerEvents, 1500);
+    return () => clearInterval(id);
+  }, [state, session]);
 
   function appendLocalLine(role: "traveler" | "agent", text: string) {
     const trimmed = text.trim();
@@ -79,8 +144,10 @@ export default function HelpClient() {
     setError(null);
     setVoiceWarning(null);
     setFamilyInvited(false);
+    setFamilyJoined(false);
     setLines([]);
     lastAgentLineRef.current = "";
+    eventSinceRef.current = 0;
     setState("requesting-mic");
 
     try {
@@ -274,8 +341,10 @@ export default function HelpClient() {
     setSession(null);
     setVoiceWarning(null);
     setFamilyInvited(false);
+    setFamilyJoined(false);
     setLines([]);
     lastAgentLineRef.current = "";
+    eventSinceRef.current = 0;
     setState("idle");
   }
 
@@ -313,6 +382,10 @@ export default function HelpClient() {
       )}
 
       <BigCallButton state={state} onTap={onTap} onEnd={onEnd} />
+
+      {live && familyJoined && (
+        <JoinedBanner visible name="Family" />
+      )}
 
       {live && (
         <section

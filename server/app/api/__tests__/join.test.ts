@@ -3,6 +3,7 @@ import { testApiHandler } from "next-test-api-route-handler";
 import * as joinRoute from "@/app/api/join/route";
 import {
   createSession,
+  getSession,
   __resetStore,
   type Flight,
 } from "@/lib/session-store";
@@ -42,10 +43,16 @@ async function post(body: unknown) {
 describe("POST /api/join", () => {
   it("verifies a valid signed `t` link", async () => {
     const s = await createSession({ flight: { ...FLIGHT } });
-    const res = await post({ t: signAccessToken(s.sessionId) });
+    const original = signAccessToken(s.sessionId);
+    const res = await post({ t: original });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toMatchObject({ sessionId: s.sessionId, verified: true });
+    expect(typeof body.t).toBe("string");
+    expect(body.t).toContain(".");
+    // Fresh TTL token (may differ from the link token).
+    const after = await getSession(s.sessionId);
+    expect(after?.presence.joiner).toBe(true);
   });
 
   it("rejects an invalid token", async () => {

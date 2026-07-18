@@ -9,6 +9,7 @@ export interface JoinGateProps {
 
 /**
  * Manual code + PIN fallback form (PLAN-v2 §6 / v1 §5.3).
+ * Primary path is the shared link; this is for when family only has a code.
  * 6-char code (auto-uppercase) + 4-digit PIN. Enter-to-submit, soft shake on failure.
  */
 export default function JoinGate({ onSubmit, error }: JoinGateProps) {
@@ -31,13 +32,13 @@ export default function JoinGate({ onSubmit, error }: JoinGateProps) {
         e.preventDefault();
         submit();
       }}
-      className={`flex flex-col gap-4 rounded-xl bg-card p-8 shadow-card ${
+      className={`flex w-full flex-col gap-4 rounded-xl bg-card p-8 shadow-card ${
         fail ? "animate-[wb-badge-flip_0.4s_ease]" : ""
       }`}
     >
       <div className="flex flex-col gap-2">
         <label htmlFor="code" className="text-sm font-medium text-text">
-          Code
+          Session code
         </label>
         <input
           id="code"
@@ -52,7 +53,7 @@ export default function JoinGate({ onSubmit, error }: JoinGateProps) {
       </div>
       <div className="flex flex-col gap-2">
         <label htmlFor="pin" className="text-sm font-medium text-text">
-          PIN <span className="text-text-muted">(optional)</span>
+          PIN <span className="text-text-muted">(if they set one)</span>
         </label>
         <input
           id="pin"
@@ -72,8 +73,12 @@ export default function JoinGate({ onSubmit, error }: JoinGateProps) {
         type="submit"
         className="inline-flex h-12 items-center justify-center rounded-full bg-accent px-6 text-base font-medium text-white shadow-card transition-transform duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] active:scale-95"
       >
-        Join the call
+        Follow live
       </button>
+      <p className="text-center text-xs leading-5 text-text-muted">
+        You’ll see the conversation and flight status — and can send a message
+        for the advocate to relay. This isn’t a voice join.
+      </p>
     </form>
   );
 }
