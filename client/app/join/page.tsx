@@ -1,4 +1,4 @@
-import JoinGate from "@/components/JoinGate";
+import JoinClient from "./JoinClient";
 
 export default function JoinPage() {
   return (
@@ -10,7 +10,7 @@ export default function JoinPage() {
         </p>
       </header>
 
-      <JoinGate />
+      <JoinClient />
     </main>
   );
 }
