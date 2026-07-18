@@ -7,37 +7,34 @@ export interface PinToggleProps {
   onChange?: (enabled: boolean) => void;
 }
 
-/**
- * Opt-in PIN toggle, OFF by default (PLAN-v2 §6 / v1 §5.2). Never blocks during distress.
- */
 export default function PinToggle({ enabled = false, onChange }: PinToggleProps) {
   const [on, setOn] = useState(enabled);
   return (
-    <label className="flex items-center justify-between gap-4 rounded-lg bg-card p-4 shadow-card">
-      <span className="flex flex-col">
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col">
         <span className="text-sm font-medium text-text">Add a PIN for extra privacy</span>
         <span className="text-xs text-text-muted">Optional — off by default.</span>
-      </span>
+      </div>
       <button
         type="button"
         role="switch"
         aria-checked={on}
-        aria-label="Add a PIN for extra privacy"
+        aria-label={`PIN privacy ${on ? "on" : "off"}`}
         onClick={() => {
           const next = !on;
           setOn(next);
           onChange?.(next);
         }}
-        className={`relative h-7 w-12 rounded-full transition-colors duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+        className={`relative h-7 w-12 shrink-0 rounded-full outline-none transition-colors duration-150 ease-standard focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${
           on ? "bg-success" : "bg-text-muted"
         }`}
       >
         <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] ${
-            on ? "translate-x-6" : "translate-x-1"
+          className={`absolute top-0.5 block h-6 w-6 rounded-full bg-white shadow transition-transform duration-150 ease-standard ${
+            on ? "translate-x-6" : "translate-x-0.5"
           }`}
         />
       </button>
-    </label>
+    </div>
   );
 }

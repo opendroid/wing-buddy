@@ -1,17 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { useSearchParams } from "next/navigation";
 import Transcript, { type TranscriptLine } from "@/components/Transcript";
 import StatusCard from "@/components/StatusCard";
 import AgentActionLog from "@/components/AgentActionLog";
 import FacilitiesCard from "@/components/FacilitiesCard";
-import JoinCallButton from "@/components/JoinCallButton";
 import DemoOverride from "@/components/DemoOverride";
+import RelayMessage from "@/components/RelayMessage";
 
 interface Flight {
   carrier: string;
   number: string;
+  date: string;
   origin: string;
   dest: string;
   status: string;
@@ -28,20 +35,108 @@ interface SessionState {
   seq: number;
 }
 
+type PollEvent = {
+  type: string;
+  seq: number;
+  role?: string;
+  lang?: string;
+  text?: string;
+  textTranslated?: string;
+  label?: string;
+  value?: string;
+  gate?: string;
+  delayMin?: number;
+  who?: string;
+  kind?: string;
+};
+
 function flightDetail(f: Flight): string {
   const delay = f.delayMin > 0 ? ` · delayed ${f.delayMin}m` : "";
   return `${f.carrier} ${f.number} · ${f.origin}→${f.dest} · Gate ${f.gate}${delay}`;
 }
 
-function ssrLabel(ssr: string): { title: string; detail: string; tone: "success" | "warning" | "neutral" } {
+function ssrLabel(ssr: string): {
+  title: string;
+  detail: string;
+  tone: "success" | "warning" | "neutral";
+} {
   switch (ssr) {
     case "confirmed":
     case "reconfirmed":
-      return { title: "Wheelchair confirmed", detail: "Assistance on file", tone: "success" };
+      return {
+        title: "Wheelchair confirmed",
+        detail: "Assistance on file",
+        tone: "success",
+      };
     case "dropped":
-      return { title: "Wheelchair dropped", detail: "Re-checking with airline…", tone: "warning" };
+      return {
+        title: "Wheelchair dropped",
+        detail: "Re-checking with airline…",
+        tone: "warning",
+      };
     default:
-      return { title: "Wheelchair / assistance", detail: "Not requested yet", tone: "neutral" };
+      return {
+        title: "Wheelchair / assistance",
+        detail: "Not requested yet",
+        tone: "neutral",
+      };
+  }
+}
+
+function applyEvents(
+  events: PollEvent[],
+  setLines: Dispatch<SetStateAction<TranscriptLine[]>>,
+  setActions: Dispatch<SetStateAction<string[]>>,
+  setState: Dispatch<SetStateAction<SessionState | null>>,
+  seenSeq: Set<number>
+) {
+  for (const ev of events) {
+    if (seenSeq.has(ev.seq)) continue;
+    seenSeq.add(ev.seq);
+
+    if (ev.type === "transcript" && ev.text && ev.role) {
+      setLines((prev) => [
+        ...prev,
+        {
+          seq: ev.seq,
+          role: ev.role as TranscriptLine["role"],
+          lang: (ev.lang as "hi" | "en") ?? "en",
+          text: ev.text!,
+          textTranslated: ev.textTranslated,
+        },
+      ]);
+    }
+    if (ev.type === "agent_action" && ev.label) {
+      setActions((prev) => [...prev, ev.label!]);
+    }
+    if (ev.type === "ssr_update" && ev.value) {
+      setState((prev) => (prev ? { ...prev, ssr: ev.value! } : prev));
+    }
+    if (ev.type === "flight_event" || ev.type === "flight_update") {
+      setState((prev) => {
+        if (!prev) return prev;
+        const flight = { ...prev.flight };
+        if (ev.gate) flight.gate = ev.gate;
+        if (typeof ev.delayMin === "number") {
+          flight.delayMin = ev.delayMin;
+          if (ev.delayMin > 0) flight.status = "delayed";
+        }
+        return { ...prev, flight };
+      });
+    }
+    if (ev.type === "presence" && ev.who === "requester") {
+      setState((prev) =>
+        prev
+          ? {
+              ...prev,
+              presence: {
+                ...prev.presence,
+                requester: ev.kind === "joined",
+              },
+            }
+          : prev
+      );
+    }
   }
 }
 
@@ -53,14 +148,14 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
   const [lines, setLines] = useState<TranscriptLine[]>([]);
   const [actions, setActions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [since, setSince] = useState(0);
+
+  // Late-joiner replay: always poll from seq 0 so prior transcript lines appear.
+  const sinceRef = useRef(0);
+  const seenSeqRef = useRef(new Set<number>());
 
   // Initial hydrate from /state
   useEffect(() => {
-    if (!t) {
-      setError("Missing access link. Join again from the share code or link.");
-      return;
-    }
+    if (!t) return;
     let cancelled = false;
     (async () => {
       try {
@@ -69,11 +164,17 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.error || `Could not load session (${res.status})`);
+          throw new Error(
+            data.error || `Could not load session (${res.status})`
+          );
         }
         if (!cancelled) {
           setState(data as SessionState);
-          setSince((data as SessionState).seq ?? 0);
+          // Keep sinceRef at 0 — events poll replays the full log.
+          sinceRef.current = 0;
+          seenSeqRef.current = new Set();
+          setLines([]);
+          setActions([]);
           setError(null);
         }
       } catch (e) {
@@ -87,91 +188,34 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
     };
   }, [sessionId, t]);
 
-  // Poll event log every 1.5s
+  // Poll event log every 1.5s (and once immediately after hydrate)
   useEffect(() => {
-    if (!t || error) return;
-    const id = setInterval(async () => {
+    if (!t || error || !state) return;
+
+    async function poll() {
       try {
         const res = await fetch(
-          `/api/session/${sessionId}/events?since=${since}&t=${encodeURIComponent(t)}`
+          `/api/session/${sessionId}/events?since=${sinceRef.current}&t=${encodeURIComponent(t)}`
         );
         if (!res.ok) return;
         const data = (await res.json()) as {
-          events?: Array<{
-            type: string;
-            seq: number;
-            role?: string;
-            lang?: string;
-            text?: string;
-            textTranslated?: string;
-            label?: string;
-            value?: string;
-            gate?: string;
-            delayMin?: number;
-            who?: string;
-            kind?: string;
-            airport?: string;
-            need?: string;
-            result?: string;
-          }>;
+          events?: PollEvent[];
           seq?: number;
         };
         const events = data.events ?? [];
         if (events.length === 0) return;
 
-        setSince(data.seq ?? events[events.length - 1]!.seq);
-
-        for (const ev of events) {
-          if (ev.type === "transcript" && ev.text && ev.role) {
-            setLines((prev) => [
-              ...prev,
-              {
-                seq: ev.seq,
-                role: ev.role as TranscriptLine["role"],
-                lang: (ev.lang as "hi" | "en") ?? "en",
-                text: ev.text!,
-                textTranslated: ev.textTranslated,
-              },
-            ]);
-          }
-          if (ev.type === "agent_action" && ev.label) {
-            setActions((prev) => [...prev, ev.label!]);
-          }
-          if (ev.type === "ssr_update" && ev.value) {
-            setState((prev) => (prev ? { ...prev, ssr: ev.value! } : prev));
-          }
-          if (ev.type === "flight_event" || ev.type === "flight_update") {
-            setState((prev) => {
-              if (!prev) return prev;
-              const flight = { ...prev.flight };
-              if (ev.gate) flight.gate = ev.gate;
-              if (typeof ev.delayMin === "number") {
-                flight.delayMin = ev.delayMin;
-                if (ev.delayMin > 0) flight.status = "delayed";
-              }
-              return { ...prev, flight };
-            });
-          }
-          if (ev.type === "presence" && ev.who === "requester") {
-            setState((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    presence: {
-                      ...prev.presence,
-                      requester: ev.kind === "joined",
-                    },
-                  }
-                : prev
-            );
-          }
-        }
+        sinceRef.current = data.seq ?? events[events.length - 1]!.seq;
+        applyEvents(events, setLines, setActions, setState, seenSeqRef.current);
       } catch {
         /* ignore transient poll errors */
       }
-    }, 1500);
+    }
+
+    void poll();
+    const id = setInterval(poll, 1500);
     return () => clearInterval(id);
-  }, [sessionId, t, since, error]);
+  }, [sessionId, t, error, state]);
 
   if (error) {
     return (
@@ -201,18 +245,21 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
       ? "warning"
       : "success";
 
+  const isDemo = searchParams.get("demo") === "1";
+
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 py-10">
+    <main className="mx-auto flex min-h-[100svh] w-full max-w-6xl flex-col gap-6 px-6 py-10">
       <header className="flex items-center justify-between">
         <div className="flex flex-col">
           <h1 className="text-xl font-semibold tracking-tight text-text">
-            Following the call
+            {state.flight.carrier} {state.flight.number} &middot;{" "}
+            {state.flight.origin}&rarr;{state.flight.dest}
           </h1>
           <p className="text-sm text-text-muted">
-            Session {sessionId.slice(0, 8)}…
+            {state.flight.date} &middot; Gate {state.flight.gate}
           </p>
         </div>
-        <DemoOverride />
+        {isDemo && <DemoOverride />}
       </header>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
@@ -225,22 +272,19 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
 
         <aside className="flex flex-col gap-3">
           <StatusCard
-            icon="🟢"
             title={
               state.presence.requester
-                ? "Traveler connected"
+                ? "Traveler is connected"
                 : "Waiting for traveler"
             }
             tone={state.presence.requester ? "success" : "neutral"}
           />
           <StatusCard
-            icon="✈️"
             title={`Flight ${state.flight.status.replace("_", " ")}`}
             detail={flightDetail(state.flight)}
             tone={flightTone}
           />
           <StatusCard
-            icon="♿"
             title={ssr.title}
             detail={ssr.detail}
             tone={ssr.tone}
@@ -251,13 +295,15 @@ export default function RoomDashboard({ sessionId }: { sessionId: string }) {
       </div>
 
       <div className="flex justify-center">
-        <JoinCallButton state="observing" />
+        <RelayMessage token={t} />
       </div>
 
-      <p className="text-center text-xs text-text-muted">
-        Tip: press <kbd className="rounded bg-bg px-1.5 py-0.5">d</kbd> to simulate a
-        disruption (presenter only).
-      </p>
+      {isDemo && (
+        <p className="text-center text-xs text-text-muted">
+          Tip: press <kbd className="rounded bg-bg px-1.5 py-0.5">d</kbd> to
+          simulate a disruption (presenter only).
+        </p>
+      )}
     </main>
   );
 }

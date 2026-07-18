@@ -21,7 +21,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full bg-bg text-text font-sans">{children}</body>
+      <body className="min-h-full bg-bg text-text font-sans [word-break:break-word] [padding-top:env(safe-area-inset-top)] [padding-bottom:env(safe-area-inset-bottom)] [padding-left:env(safe-area-inset-left)] [padding-right:env(safe-area-inset-right)]">
+        {children}
+      </body>
     </html>
   );
 }

@@ -13,17 +13,17 @@ export interface TranscriptLine {
 
 export interface TranscriptProps {
   lines: TranscriptLine[];
-  /** Dense variant used on the joiner dashboard. */
   dense?: boolean;
-  /** Bilingual toggle (English/Hindi) on the joiner side. */
   showTranslation?: boolean;
 }
 
-/**
- * Speaker-attributed, bilingual, auto-scrolling transcript (PLAN-v2 §6).
- * Color + label per speaker (lib/design/tokens.ts speakerColors).
- * Fades vivid -> dimmed after 10s; ARIA live region for VoiceOver.
- */
+const speakerLabel: Record<Speaker, string> = {
+  traveler: "Traveler",
+  agent: "AI Advocate",
+  joiner: "Family",
+  airline: "Airline",
+};
+
 export default function Transcript({
   lines,
   dense = false,
@@ -31,7 +31,6 @@ export default function Transcript({
 }: TranscriptProps) {
   return (
     <section
-      aria-live="polite"
       aria-label="Conversation transcript"
       className={`flex flex-col gap-3 ${dense ? "text-sm" : "text-base"}`}
     >
@@ -47,11 +46,22 @@ export default function Transcript({
             className="text-xs font-medium uppercase tracking-wide"
             style={{ color: speakerColor(line.role) }}
           >
-            {line.role}
+            {speakerLabel[line.role] ?? line.role}
           </span>
-          <p className="leading-6 text-text">{line.text}</p>
+          <p
+            className="leading-6 text-text"
+            lang={line.lang}
+            dir={line.lang === "hi" ? "ltr" : undefined}
+          >
+            {line.text}
+          </p>
           {showTranslation && line.textTranslated && (
-            <p className="leading-6 text-text-muted">{line.textTranslated}</p>
+            <p
+              className="leading-6 text-text-muted"
+              lang={line.lang === "hi" ? "en" : "hi"}
+            >
+              {line.textTranslated}
+            </p>
           )}
         </article>
       ))}

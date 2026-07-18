@@ -3,15 +3,11 @@
 import { useState } from "react";
 
 export interface BigCallButtonProps {
-  state?: "idle" | "connecting" | "connected";
+  state?: "idle" | "requesting-mic" | "connecting" | "connected" | "error";
   onTap?: () => void;
   onEnd?: () => void;
 }
 
-/**
- * Requester's huge pulsing "Tap to Get Help" CTA (PLAN-v2 §6 / v1 §5.2).
- * State 1 (idle) only in this stub; connecting/connected wired in Hour 2.
- */
 export default function BigCallButton({
   state = "idle",
   onTap,
@@ -21,13 +17,37 @@ export default function BigCallButton({
 
   if (state === "connected") {
     return (
-      <button
-        type="button"
-        onClick={onEnd}
-        className="mt-8 inline-flex h-16 w-full max-w-sm items-center justify-center rounded-full bg-danger px-8 text-lg font-semibold text-white shadow-card transition-transform duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] active:scale-95"
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-success/15">
+          <span className="text-3xl text-success">&#10003;</span>
+        </div>
+        <p className="text-base font-medium text-text">You&rsquo;re connected</p>
+        <button
+          type="button"
+          onClick={onEnd}
+          className="inline-flex h-12 items-center justify-center rounded-full bg-text-muted/20 px-6 text-sm font-medium text-text-muted transition-colors duration-150 ease-standard hover:bg-danger/10 hover:text-danger"
+        >
+          End session
+        </button>
+      </div>
+    );
+  }
+
+  if (state === "requesting-mic") {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex flex-col items-center gap-4"
       >
-        End Call
-      </button>
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent/10">
+          <span
+            aria-hidden
+            className="h-7 w-7 animate-spin rounded-full border-2 border-accent/30 border-t-accent"
+          />
+        </div>
+        <p className="text-base text-text-muted">Allow microphone access…</p>
+      </div>
     );
   }
 
@@ -36,13 +56,15 @@ export default function BigCallButton({
       <div
         role="status"
         aria-live="polite"
-        className="mt-8 flex h-44 w-44 flex-col items-center justify-center gap-3 rounded-full bg-accent/90 text-center text-base font-semibold text-white shadow-card"
+        className="flex flex-col items-center gap-4"
       >
-        <span
-          aria-hidden
-          className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white"
-        />
-        Connecting…
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent/10">
+          <span
+            aria-hidden
+            className="h-7 w-7 animate-spin rounded-full border-2 border-accent/30 border-t-accent"
+          />
+        </div>
+        <p className="text-base text-text-muted">Connecting to advocate…</p>
       </div>
     );
   }
@@ -54,12 +76,12 @@ export default function BigCallButton({
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
-      aria-label="Tap to get help"
-      className={`wb-pulse-ring relative mt-8 inline-flex h-44 w-44 items-center justify-center rounded-full bg-accent text-xl font-semibold text-white shadow-card outline-none transition-transform duration-150 ease-[cubic-bezier(0.34,1.56,0.64,1)] focus-visible:ring-4 focus-visible:ring-accent/40 ${
-        pressed ? "scale-95" : "scale-100"
+      aria-label="Tap to get help from an AI advocate"
+      className={`relative mt-4 inline-flex h-16 w-full max-w-sm items-center justify-center rounded-full bg-accent px-8 text-lg font-semibold text-white shadow-card outline-none transition-[transform,box-shadow] duration-250 ease-spring focus-visible:ring-4 focus-visible:ring-accent/40 active:scale-[0.98] ${
+        pressed ? "scale-[0.98]" : ""
       }`}
     >
-      Tap to Get Help
+      Get help now
     </button>
   );
 }
