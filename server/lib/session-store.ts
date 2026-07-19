@@ -18,6 +18,7 @@ export interface Flight {
   status: FlightStatus;
   gate: string;
   delayMin: number;
+  seat?: string;
 }
 
 export interface Session {

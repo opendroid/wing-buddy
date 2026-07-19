@@ -210,7 +210,10 @@ describe("POST /api/relay", () => {
         expect(res.status).toBe(201);
       },
     });
-    const ev = (await getSession(s.sessionId))!.events.at(-1);
+    // A question relay also appends an agent reply afterward, so find the
+    // family_message rather than assuming it's the last event.
+    const evs = (await getSession(s.sessionId))!.events;
+    const ev = evs.find((e) => e.type === "family_message");
     expect(ev?.type).toBe("family_message");
     expect(ev && ev.type === "family_message" && ev.text).toBe("Raj: Are you okay?");
   });

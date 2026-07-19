@@ -36,6 +36,8 @@ describe("classifyIntent", () => {
     expect(classifyIntent("मुझे दवाई के लिए पानी चाहिए")).toBe("facilities");
     expect(classifyIntent("my gate changed, गेट बदल गया")).toBe("flight_recheck");
     expect(classifyIntent("what is my flight status")).toBe("flight_status");
+    expect(classifyIntent("what is her seat")).toBe("seat");
+    expect(classifyIntent("मेरी सीट कौन सी है")).toBe("seat");
     expect(classifyIntent("please tell my family")).toBe("notify_family");
     expect(classifyIntent("hello")).toBe("reassure");
   });
@@ -88,6 +90,17 @@ describe("handleQuery", () => {
     expect(r.intent).toBe("facilities");
     const fac = s.events.find((e) => e.type === "facilities");
     expect(fac).toMatchObject({ type: "facilities", need: "water", airport: "SFO" });
+  });
+
+  it("seat → returns the seat assignment", async () => {
+    const s = await mk();
+    await mutateSession(s, (x) => {
+      x.flight.seat = "12C";
+    });
+    const r = await handleQuery(s, "what is her seat");
+    expect(r.intent).toBe("seat");
+    expect(r.answer).toContain("12C");
+    expect(s.events.some((e) => e.type === "agent_action")).toBe(true);
   });
 
   it("ends reassurances with the calm sign-off", async () => {

@@ -16,6 +16,7 @@ const FALLBACK_FLIGHT: Flight = {
   status: "on_time",
   gate: "14A",
   delayMin: 0,
+  seat: "12C",
 };
 
 export async function POST(req: Request) {
@@ -39,6 +40,9 @@ export async function POST(req: Request) {
       flight = { ...FALLBACK_FLIGHT };
       flightSource = "fallback";
     }
+    // Sabre shopping data carries no seat assignment; seed a demo seat so the
+    // agent can answer "what is her seat".
+    if (!flight.seat) flight = { ...flight, seat: "12C" };
 
     const session = await createSession({
       flight,

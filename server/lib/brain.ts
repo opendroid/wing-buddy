@@ -14,6 +14,7 @@ export type Intent =
   | "facilities"
   | "flight_recheck"
   | "flight_status"
+  | "seat"
   | "notify_family"
   | "reassure";
 
@@ -31,6 +32,7 @@ const MEDICINE = ["medicine", "medication", "pill", "tablet", "दवा", "द�
 const WHEELCHAIR = ["wheelchair", "व्हीलचेयर", "व्हील चेयर", "wchr"];
 const RECHECK = ["re-check", "recheck", "check booking", "flight changed", "gate change", "गेट बदल", "फिर से", "दोबारा"];
 const STATUS = ["status", "flight", "gate", "time", "delay", "फ्लाइट", "गेट", "समय", "देरी"];
+const SEAT = ["seat", "सीट"];
 const NOTIFY = ["tell my family", "notify", "inform", "परिवार को बता", "family ko"];
 
 function has(text: string, words: string[]): boolean {
@@ -51,6 +53,7 @@ export function classifyIntent(text: string): Intent {
   if (detectNeed(text)) return "facilities";
   if (has(text, RECHECK)) return "flight_recheck";
   if (has(text, NOTIFY)) return "notify_family";
+  if (has(text, SEAT)) return "seat";
   if (has(text, STATUS)) return "flight_status";
   return "reassure";
 }
@@ -152,6 +155,17 @@ export async function handleQuery(
       return {
         intent,
         answer: `आपकी फ्लाइट ${f.carrier} ${f.number} ${statusHi} है, गेट ${f.gate}। ${REASSURE}`,
+      };
+    }
+
+    case "seat": {
+      await appendEvent(session, { type: "agent_action", label: "Checked seat assignment" });
+      const seat = session.flight.seat;
+      return {
+        intent,
+        answer: seat
+          ? `आपकी सीट ${seat} है। ${REASSURE}`
+          : `अभी सीट की जानकारी उपलब्ध नहीं है, पर मैं फ्लाइट और गेट बता सकती हूँ। ${REASSURE}`,
       };
     }
 
